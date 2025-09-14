@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字人文平台</title>
+    <!-- 使用 CDN 引入 Cesium -->
+    <script src="https://cdn.jsdelivr.net/npm/cesium@1.105/Build/Cesium/Cesium.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/cesium@1.105/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #cesiumContainer {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        .control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            background: rgba(40, 40, 40, 0.8);
+            padding: 15px;
+            border-radius: 5px;
+            color: white;
+        }
+        .title {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(40, 40, 40, 0.8);
+            padding: 25px;  /* 增加内边距 */
+            border-radius: 5px;
+            color: white;
+            font-size: 40px;  /* 增大标题字号 */
+            text-align: center;
+            font-weight: bold;  /* 加粗显示 */
+            letter-spacing: 2px;  /* 增加字间距 */
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);  /* 添加文字阴影 */
+        }
+        .info-panel {
+            display: none;
+            position: fixed;
+            background: rgba(40, 40, 40, 0.95);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            width: 400px;
+            z-index: 1000;
+            font-size: 24px;
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+            line-height: 1.8;
+            pointer-events: none;
+            /* 进一步向右移动面板位置 */
+            right: 420px;  /* 继续增加右侧距离 */
+            top: 100px;
+        }
+        .info-panel h3 {
+            font-size: 32px;  /* 进一步增大标题字号 */
+            margin-bottom: 25px;  /* 增加标题下方间距 */
+            font-weight: bold;
+            border-bottom: 3px solid rgba(255, 255, 255, 0.3);  /* 加粗标题下划线 */
+            padding-bottom: 15px;  /* 增加标题下划线间距 */
+        }
+        .info-panel p {
+            font-size: 24px;  /* 进一步增大段落字号 */
+            margin: 18px 0;  /* 增加段落间距 */
+            line-height: 1.8;
+        }
+        .info-panel p:first-of-type {
+            margin-top: 0;
+        }
+        .info-panel p:last-of-type {
+            margin-bottom: 0;
+        }
+        .timeline-container {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(40, 40, 40, 0.9);
+            padding: 20px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1000;
+            width: 80%;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        
+        .timeline-controls {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 15px;
+            gap: 15px; /* 控件之间的间距 */
+        }
+
+        .play-button {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+            font-size: 18px;
+        }
+
+        .play-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .timeline-slider {
+            width: 100%;
+            margin: 10px 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+            outline: none;
+        }
+
+        .timeline-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .timeline-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+        }
+        
+        .timeline-date {
+            font-size: 24px;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .timeline-info {
+            font-size: 18px;
+            margin-top: 8px;
+            color: rgba(255, 255, 255, 0.9);
+            max-width: 800px;
+            margin: 8px auto;
+            line-height: 1.4;
+        }
+
+        .speed-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 16px;
+        }
+
+        .speed-select {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            cursor: pointer;
+            outline: none;
+            font-size: 16px;
+        }
+
+        .speed-select option {
+            background: #333;
+            color: white;
+        }
+
+        .timeline-container {
+            pointer-events: auto !important;
+            touch-action: none;
+            user-select: none;
+        }
+        
+        .timeline-container * {
+            pointer-events: auto !important;
+        }
+
+        .play-button {
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 4px;
+            margin-right: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .play-button:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        /* 修改侧栏和按钮样式 */
+        .sidebar {
+            position: fixed;
+            right: -300px;  /* 默认隐藏在右侧 */
+            top: 0;
+            width: 300px;
+            height: 100%;
+            background: rgba(40, 40, 40, 0.9);
+            color: white;
+            transition: right 0.3s ease;  /* 添加过渡动画 */
+            overflow-y: auto;
+            z-index: 1000;
+            padding: 20px;
+            opacity: 0;  /* 默认完全透明 */
+            visibility: hidden;  /* 默认隐藏 */
+        }
+
+        .sidebar.active {
+            right: 0;
+            opacity: 1;  /* 显示时完全不透明 */
+            visibility: visible;  /* 显示时可见 */
+        }
+
+        .sidebar-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(40, 40, 40, 0.7);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            z-index: 1001;
+            transition: background-color 0.3s;
+        }
+
+        .sidebar-toggle:hover {
+            background: rgba(60, 60, 60, 0.7);
+        }
+
+        /* 添加鼠标悬停时的显示逻辑 */
+        .sidebar-toggle:hover + .sidebar,
+        .sidebar:hover {
+            right: 0;
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .location-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .location-item {
+            padding: 15px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-size: 18px;
+        }
+
+        .location-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .location-item strong {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .location-item em {
+            font-size: 16px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+    </style>
+</head>
+<body>
+    <!-- 地图容器 -->
+    <div id="cesiumContainer"></div>
+    <div class="title">长征革命文物数字化传承平台</div>
+
+    <!-- 自定义控制面板 -->
+    <div class="control-panel">
+        <button onclick="resetView()">重置视角</button>
+        <!-- 移除了全屏切换按钮 -->
+    </div>
+
+    <div id="info-panel" class="info-panel"></div>
+
+    <!-- 修改时间滑块容器结构 -->
+    <div class="timeline-container">
+        <div class="timeline-controls">
+            <button id="playButton" class="play-button">播放</button>
+            <div class="speed-control">
+                <span>播放速度:</span>
+                <select id="speedSelect" class="speed-select">
+                    <option value="5000">慢速</option>
+                    <option value="3000" selected>中速</option>
+                    <option value="1000">快速</option>
+                </select>
+            </div>
+        </div>
+        <input type="range" id="timelineSlider" class="timeline-slider" min="0" max="32" value="0">
+        <div id="timelineDate" class="timeline-date"></div>
+        <div id="timelineInfo" class="timeline-info"></div>
+    </div>
+
+    <!-- 添加侧栏切换按钮 -->
+    <button class="sidebar-toggle" id="locationSummaryBtn">
+        📍 地点汇总
+        <div class="sidebar-tooltip">点击查看详细地点列表</div>
+    </button>
+
+    <!-- 添加侧栏 -->
+    <div class="sidebar">
+        <h2>长征路线地点</h2>
+        <ul class="location-list">
+            <!-- 地点列表将通过 JavaScript 动态生成 -->
+        </ul>
+    </div>
+
+    <script>
+        "use strict";  // 启用严格模式
+
+        // 设置 Cesium Ion Access Token
+        Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiMzQ5OTY3ZC03YjNjLTQzMDctYTBhZi1kZWI1YmVkMzc2NTUiLCJpZCI6Mjc2NTQ4LCJpYXQiOjE3Mzk3ODk5NTB9.rvU_41gfM6Xiq0gXhgeB8aw9NM7ZYBgvZsRBaFlPEJ0';
+
+        // 初始化 Viewer
+        let viewer;
+        Cesium.createWorldTerrainAsync().then(terrainProvider => {
+            viewer = new Cesium.Viewer('cesiumContainer', {
+                terrainProvider: terrainProvider,
+                animation: false,
+                timeline: false,
+                baseLayerPicker: false,
+                fullscreenButton: false,  // 禁用默认全屏按钮
+                geocoder: false,
+                sceneModePicker: false,
+                navigationHelpButton: false,
+                shadows: false,
+                shouldAnimate: true,
+                scene3DOnly: true,
+                orderIndependentTranslucency: false,
+                requestRenderMode: true,  // 启用按需渲染
+                maximumRenderTimeChange: Infinity,
+                contextOptions: {
+                    webgl: {
+                        alpha: false,
+                        antialias: true,
+                        preserveDrawingBuffer: true,
+                        failIfMajorPerformanceCaveat: false
+                    }
+                },
+                screenSpaceCameraController: {
+                    zoomFactor: 0.8,
+                    minimumZoomDistance: 500,
+                    maximumZoomDistance: 10000000,
+                    inertiaZoom: 0.85
+                }
+            });
+
+            // 性能优化配置
+            viewer.scene.globe.depthTestAgainstTerrain = true;
+            viewer.scene.postProcessStages.fxaa.enabled = false;
+            viewer.scene.highDynamicRange = false;
+
+            // 定义长征路线点位数据
+            const longMarchData = [
+            { id: 1, name: "瑞金市叶坪乡", province: "江西", x: 116.03, y: 25.89, remark: "中央红军长征出发地", time: "1934/10/10" },
+            { id: 2, name: "于都县贡江镇", province: "江西", x: 115.42, y: 25.96, remark: "中央红军主力渡于都河", time: "1934/10/17" },
+            { id: 3, name: "信丰县新田镇", province: "江西", x: 114.94, y: 25.37, remark: "突破第一道封锁线", time: "1934/10/21" },
+            { id: 4, name: "汝城县延寿瑶族乡", province: "湖南", x: 113.68, y: 25.55, remark: "突破第二道封锁线", time: "1934/11/8" },
+            { id: 5, name: "宜章县白石渡镇", province: "湖南", x: 112.94, y: 25.4, remark: "突破第三道封锁线", time: "1934/11/15" },
+            { id: 6, name: "全州县凤凰镇", province: "广西", x: 111.07, y: 25.93, remark: "湘江战役中红一军团阻击阵地", time: "1934/11/27" },
+            { id: 7, name: "兴安县界首镇", province: "广西", x: 110.8, y: 25.73, remark: "湘江战役核心渡口（红军损失惨重）", time: "1934/12/1" },
+            { id: 8, name: "通道县县溪镇", province: "湖南", x: 109.78, y: 26.16, remark: "通道会议（转兵贵州）", time: "1934/12/12" },
+            { id: 9, name: "黎平县德凤镇", province: "贵州", x: 109.14, y: 26.23, remark: "黎平会议（确定向黔北进军）", time: "1934/12/18" },
+            { id: 10, name: "瓮安县猴场镇", province: "贵州", x: 107.47, y: 27.04, remark: "猴场会议（遵义会议的前夜）", time: "1935/1/1" },
+            { id: 11, name: "遵义市红花岗区", province: "贵州", x: 106.92, y: 27.7, remark: "遵义会议", time: "1935/1/15" },
+            { id: 12, name: "元厚镇（猿猴场）", province: "贵州", x: 106.04, y: 28.27, remark: "红军分三路从元厚镇、土城南北地区西渡赤水河，向四川省古蔺、叙永地区前进，一渡赤水", time: "1935/1/29" },
+            { id: 13, name: "土城镇", province: "贵州", x: 105.97, y: 28.32, remark: "红军在土城、青杠坡地区对尾追的川军发起猛攻，后决定撤出战斗，西渡赤水河", time: "1935/1/29" },
+            { id: 14, name: "叙永县太平镇", province: "四川", x: 105.73, y: 28.05, remark: "红军右纵队进攻叙永不克，继续西进，在毛坝、大坝等地遭川军截击", time: "1935/2/2" },
+            { id: 15, name: "扎西镇（今威信县）", province: "云南", x: 105.05, y: 28.03, remark: "红军在扎西地区集结完毕，并召开扎西会议（1935年2月5日至9日）决定东渡赤水河，红军回师黔北", time: "1935/2/9" },
+            { id: 16, name: "太平渡", province: "贵州", x: 106.17, y: 28.12, remark: "红军从太平渡、二郎滩渡过赤水河，回师黔北，二渡赤水", time: "1935/2/18" },
+            { id: 17, name: "桐梓县娄山关", province: "贵州", x: 106.82, y: 27.68, remark: "红军进攻娄山关及其以南地区的黔军，攻占娄山关", time: "1935/2/25" },
+            { id: 18, name: "遵义市", province: "贵州", x: 106.9, y: 27.57, remark: "红军再占遵义城，并控制城西南的老鸦山、红花岗一线高地", time: "1935/2/28" },
+            { id: 19, name: "茅台镇", province: "贵州", x: 106.31, y: 27.72, remark: "红军在茅台及其附近西渡赤水河，进入川南，三渡赤水", time: "1935/3/16" },
+            { id: 20, name: "古蔺县二郎镇", province: "四川", x: 106.03, y: 28.23, remark: "红军进入古蔺县，摆出北渡长江的态势，蒋介石再次将主力集中到川南", time: "1935/3/19" },
+            { id: 21, name: "二郎滩", province: "贵州", x: 106.17, y: 28.12, remark: "红军从二郎滩、太平渡、九溪口第四次渡过赤水河", time: "1935/3/22" },
+            { id: 22, name: "仁怀县喜头镇", province: "贵州", x: 106.44, y: 27.77, remark: "红军经仁怀县多地行进，继续南移，摆脱敌军追击", time: "1935/3/23" },
+            { id: 23, name: "禄劝县皎平渡镇", province: "云南", x: 102.42, y: 26.12, remark: "巧渡金沙江（红军总参谋长刘伯承率领先遣队抢占皎平渡口，缴获木船并成功渡过金沙江）", time: "1935/5/9" },
+            { id: 24, name: "石棉县安顺场镇", province: "四川", x: 102.36, y: 29.23, remark: "强渡大渡河（红军先头部队在安顺场强渡大渡河，成功占领北岸渡口）", time: "1935/5/25" },
+            { id: 25, name: "泸定县泸桥镇", province: "四川", x: 102.23, y: 29.91, remark: "飞夺泸定桥（红军红四团突击队在天下大雨的情况下，一昼夜奔袭240里，成功夺取泸定桥）", time: "1935/5/29" },
+            { id: 26, name: "宝兴县硗碛藏族乡", province: "四川", x: 102.82, y: 30.69, remark: "翻越夹金山（红军从宝兴县硗碛村出发，历经7天7夜翻越夹金山，与红四方面军在懋功会师）", time: "1935/6/12" },
+            { id: 27, name: "小金县达维镇", province: "四川", x: 102.36, y: 31.01, remark: "红一、红四方面军在懋功（今小金）会师", time: "1935/6/18" },
+            { id: 28, name: "若尔盖县班佑乡", province: "四川", x: 102.96, y: 33.58, remark: "红军右路军从毛儿盖出发，经过7天艰苦行军，到达草地尽头的班佑地区", time: "1935/8/27" },
+            { id: 29, name: "迭部县旺藏乡", province: "甘肃", x: 103.23, y: 34.06, remark: "攻克腊子口前指挥部驻地", time: "1935/9/17" },
+            { id: 30, name: "通渭县榜罗镇", province: "甘肃", x: 105.25, y: 35.2, remark: "榜罗镇会议（确定陕北为终点）", time: "1935/9/27" },
+            { id: 31, name: "吴起镇", province: "陕西", x: 108.4, y: 36.92, remark: "中央红军到达陕甘根据地的吴起镇，与陕北红军胜利会师", time: "1935/10/19" },
+            { id: 32, name: "会宁县", province: "甘肃", x: 105.04, y: 35.68, remark: "红一方面军与红四方面军在会宁县城胜利会师", time: "1936/10/9" },
+            { id: 33, name: "西吉县将台堡", province: "宁夏回族自治区", x: 105.98, y: 35.85, remark: "红一方面军与红二方面军在将台堡胜利会师，标志着红军三大主力长征胜利结束", time: "1936/10/22" }
+        ];
+
+            // 修改相机初始化配置
+            const initialView = {
+                destination: Cesium.Cartesian3.fromDegrees(
+                    105.0,   // 经度（调整到长征路线中心位置）
+                    32.0,    // 纬度（调整到更靠北的位置以显示完整路线）
+                    8000000  // 高度（增加高度以获得更广的俯视视角）
+                ),
+                orientation: {
+                    heading: Cesium.Math.toRadians(0),   // 北向
+                    pitch: Cesium.Math.toRadians(-90),   // 完全俯视
+                    roll: 0
+                }
+            };
+
+            // 设置相机约束
+            viewer.scene.screenSpaceCameraController.minimumZoomDistance = 100;
+            viewer.scene.screenSpaceCameraController.maximumZoomDistance = 20000000;
+
+            // 初始化视角
+            viewer.camera.setView(initialView);
+
+            // 修改重置视角功能
+            window.resetView = function () {
+                viewer.camera.flyTo({
+                    ...initialView,
+                    duration: 2,  // 飞行时间（秒）
+                    easingFunction: Cesium.EasingFunction.QUINTIC_IN_OUT
+                });
+            };
+
+            // 确保所有点位在初始化时就显示
+            function showAllPoints() {
+                viewer.entities.values.forEach(entity => {
+                    if (entity.id.startsWith('point-')) {
+                        entity.show = true;
+                    }
+                });
+                
+                const positions = longMarchData.map(point => 
+                    Cesium.Cartesian3.fromDegrees(point.x, point.y, 5000)
+                );
+                
+                const routeEntity = viewer.entities.getById('long-march-route');
+                if (routeEntity) {
+                    routeEntity.polyline.positions = new Cesium.CallbackProperty(() => {
+                        return positions;
+                    }, false);
+                }
+            }
+
+            // 在初始化时立即显示所有点位
+            showAllPoints();
+
+            // 窗口尺寸变化处理
+            window.addEventListener('resize', () => {
+                viewer.resize();
+            });
+
+            // 替代方案：使用多段线绘制
+            const positions = [];
+            for (let i = 0; i < longMarchData.length - 1; i++) {
+                // 在两点之间插入多个点以形成平滑的曲线
+                const startPoint = longMarchData[i];
+                const endPoint = longMarchData[i + 1];
+                
+                // 在两点之间插入10个点
+                for (let j = 0; j <= 10; j++) {
+                    const fraction = j / 10;
+                    const lat = startPoint.y + (endPoint.y - startPoint.y) * fraction;
+                    const lon = startPoint.x + (endPoint.x - startPoint.x) * fraction;
+                    positions.push(Cesium.Cartesian3.fromDegrees(lon, lat, 5000));
+                }
+            }
+
+            viewer.entities.add({
+                id: 'long-march-route', // 为路线添加自定义ID
+                polyline: {
+                    positions: positions,
+                    width: 3,
+                    material: new Cesium.PolylineDashMaterialProperty({
+                        color: Cesium.Color.RED.withAlpha(0.9),
+                        dashLength: 16.0
+                    }),
+                    clampToGround: false,
+                    classificationType: Cesium.ClassificationType.BOTH,
+                    zIndex: 100,
+                    show: true
+                }
+            });
+
+            // 修改添加点位的部分
+            longMarchData.forEach(point => {
+                viewer.entities.add({
+                    id: `point-${point.id}`, // 使用自定义ID
+                    position: Cesium.Cartesian3.fromDegrees(point.x, point.y, 5000),
+                    point: {
+                        pixelSize: 10,
+                        color: Cesium.Color.WHITE,
+                        outlineColor: Cesium.Color.BLACK,
+                        outlineWidth: 2,
+                        disableDepthTestDistance: Number.POSITIVE_INFINITY
+                    },
+                    properties: {
+                        name: point.name,
+                        province: point.province,
+                        x: point.x,
+                        y: point.y,
+                        remark: point.remark,
+                        time: point.time
+                    },
+                    show: true
+                });
+            });
+
+            // 修改点击事件处理
+            const infoPanel = document.getElementById('info-panel');
+            const handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+            
+            handler.setInputAction(function(click) {
+                const pickedObject = viewer.scene.pick(click.position);
+                
+                if (Cesium.defined(pickedObject) && 
+                    pickedObject.id && 
+                    pickedObject.id.properties && 
+                    pickedObject.id.id.startsWith('point-')) { // 只处理点位实体
+                    
+                    const properties = pickedObject.id.properties;
+                    
+                    showInfoPanel(Cesium.Cartesian3.fromDegrees(properties.x.getValue(), properties.y.getValue(), 5000), `
+                        <h3>${properties.name.getValue()}</h3>
+                        <p>省份：${properties.province.getValue()}</p>
+                        <p>经度：${properties.x.getValue()}</p>
+                        <p>纬度：${properties.y.getValue()}</p>
+                        <p>备注：${properties.remark.getValue()}</p>
+                        <p>时间：${properties.time.getValue()}</p>
+                    `);
+                } else {
+                    infoPanel.style.display = 'none';
+                }
+            }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+            // 添加点击其他地方关闭信息面板的处理
+            document.addEventListener('click', function(event) {
+                if (!event.target.closest('#info-panel') && 
+                    !event.target.closest('#cesiumContainer')) {
+                    infoPanel.style.display = 'none';
+                }
+            });
+
+            // 修改时间处理函数
+            function setupTimeline() {
+                const slider = document.getElementById('timelineSlider');
+                const dateDisplay = document.getElementById('timelineDate');
+                const infoDisplay = document.getElementById('timelineInfo');
+                const playButton = document.getElementById('playButton');
+                const speedSelect = document.getElementById('speedSelect');
+                const timelineContainer = document.querySelector('.timeline-container');
+                let isPlaying = false;
+                let animationFrameId = null;
+                let lastTime = 0;
+                
+                const STEPS_BETWEEN_POINTS = 50;
+                const totalSteps = (longMarchData.length - 1) * STEPS_BETWEEN_POINTS;
+
+                // 添加日期插值函数
+                function interpolateDates(startDate, endDate, fraction) {
+                    const start = new Date(startDate.replace('/', '-').replace('/', '-'));
+                    const end = new Date(endDate.replace('/', '-').replace('/', '-'));
+                    const timestamp = start.getTime() + (end.getTime() - start.getTime()) * fraction;
+                    const date = new Date(timestamp);
+                    return `${date.getFullYear()}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getDate().toString().padStart(2, '0')}`;
+                }
+
+                // 修改更新步骤函数，优化路线更新逻辑
+                function updateToStep(step) {
+                    const pointIndex = Math.floor(step / STEPS_BETWEEN_POINTS);
+                    const fraction = (step % STEPS_BETWEEN_POINTS) / STEPS_BETWEEN_POINTS;
+                    
+                    const currentPoint = longMarchData[pointIndex];
+                    const nextPoint = longMarchData[Math.min(pointIndex + 1, longMarchData.length - 1)];
+                    
+                    // 更新日期和信息显示
+                    const currentDate = interpolateDates(currentPoint.time, nextPoint.time, fraction);
+                    dateDisplay.textContent = currentDate;
+                    infoDisplay.textContent = `${currentPoint.name} - ${currentPoint.remark}`;
+
+                    // 更新点位显示
+                    viewer.entities.values.forEach(entity => {
+                        if (entity.id.startsWith('point-')) {
+                            const pointId = parseInt(entity.id.split('-')[1]);
+                            entity.show = pointId <= pointIndex + 1;
+                            
+                            // 高亮当前点
+                            if (pointId === currentPoint.id) {
+                                entity.point.pixelSize = 15;
+                                entity.point.color = Cesium.Color.YELLOW;
+                                
+                                // 显示当前点的信息面板
+                                const infoPanel = document.getElementById('info-panel');
+                                infoPanel.innerHTML = `
+                                    <h3>${currentPoint.name}</h3>
+                                    <p>省份：${currentPoint.province}</p>
+                                    <p>经度：${currentPoint.x}</p>
+                                    <p>纬度：${currentPoint.y}</p>
+                                    <p>备注：${currentPoint.remark}</p>
+                                    <p>时间：${currentPoint.time}</p>
+                                `;
+                                infoPanel.style.display = 'block';
+                            } else {
+                                // 恢复其他点的默认样式
+                                entity.point.pixelSize = 10;
+                                entity.point.color = Cesium.Color.WHITE;
+                            }
+                        }
+                    });
+
+                    // 优化路线更新逻辑
+                    const positions = [];
+                    
+                    // 添加已经过的所有点
+                    for (let i = 0; i <= pointIndex; i++) {
+                        positions.push(Cesium.Cartesian3.fromDegrees(
+                            longMarchData[i].x,
+                            longMarchData[i].y,
+                            5000
+                        ));
+                    }
+                    
+                    // 只在需要时添加插值点
+                    if (pointIndex < longMarchData.length - 1 && fraction > 0) {
+                        const interpolatedX = currentPoint.x + (nextPoint.x - currentPoint.x) * fraction;
+                        const interpolatedY = currentPoint.y + (nextPoint.y - currentPoint.y) * fraction;
+                        positions.push(Cesium.Cartesian3.fromDegrees(interpolatedX, interpolatedY, 5000));
+                    }
+
+                    // 一次性更新路线
+                    const routeEntity = viewer.entities.getById('long-march-route');
+                    if (routeEntity) {
+                        routeEntity.polyline.positions = new Cesium.CallbackProperty(() => {
+                            return positions;
+                        }, false);
+                    }
+                }
+
+                // 修改初始化路线的方式
+                function showAllPoints() {
+                    viewer.entities.values.forEach(entity => {
+                        if (entity.id.startsWith('point-')) {
+                            entity.show = true;
+                        }
+                    });
+                    
+                    const positions = longMarchData.map(point => 
+                        Cesium.Cartesian3.fromDegrees(point.x, point.y, 5000)
+                    );
+                    
+                    const routeEntity = viewer.entities.getById('long-march-route');
+                    if (routeEntity) {
+                        routeEntity.polyline.positions = new Cesium.CallbackProperty(() => {
+                            return positions;
+                        }, false);
+                    }
+                }
+
+                // 修改只显示起点的函数
+                function showOnlyStart() {
+                    viewer.entities.values.forEach(entity => {
+                        if (entity.id.startsWith('point-')) {
+                            const pointId = parseInt(entity.id.split('-')[1]);
+                            entity.show = pointId === 1;
+                        }
+                    });
+                    
+                    const routeEntity = viewer.entities.getById('long-march-route');
+                    if (routeEntity) {
+                        const startPoint = longMarchData[0];
+                        routeEntity.polyline.positions = new Cesium.CallbackProperty(() => {
+                            return [Cesium.Cartesian3.fromDegrees(startPoint.x, startPoint.y, 5000)];
+                        }, false);
+                    }
+                }
+
+                // 优化动画函数
+                function animate(currentTime) {
+                    if (!isPlaying) {
+                        cancelAnimationFrame(animationFrameId);
+                        animationFrameId = null;
+                        return;
+                    }
+
+                    if (!lastTime) lastTime = currentTime;
+                    const deltaTime = currentTime - lastTime;
+                    const speed = parseInt(speedSelect.value);
+
+                    if (deltaTime >= speed / STEPS_BETWEEN_POINTS) {
+                        const currentValue = parseInt(slider.value);
+                        if (currentValue < totalSteps) {
+                            slider.value = currentValue + 1;
+                            updateToStep(currentValue + 1);
+                            lastTime = currentTime;
+                        } else {
+                            stopPlay();
+                            return;
+                        }
+                    }
+
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+
+                function startPlay() {
+                    if (isPlaying || animationFrameId) return; // 防止重复启动
+                    
+                    isPlaying = true;
+                    playButton.textContent = '暂停';
+                    lastTime = 0;
+                    
+                    // 只在完整播放结束后重置
+                    if (parseInt(slider.value) >= totalSteps) {
+                        slider.value = 0;
+                        showOnlyStart();
+                    }
+                    
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+
+                function stopPlay() {
+                    if (!isPlaying && !animationFrameId) return;
+                    
+                    isPlaying = false;
+                    if (animationFrameId) {
+                        cancelAnimationFrame(animationFrameId);
+                        animationFrameId = null;
+                    }
+                    lastTime = 0;
+                    playButton.textContent = '播放';
+                    
+                    // 隐藏信息面板
+                    const infoPanel = document.getElementById('info-panel');
+                    infoPanel.style.display = 'none';
+                    
+                    // 恢复所有点的默认样式
+                    viewer.entities.values.forEach(entity => {
+                        if (entity.id.startsWith('point-')) {
+                            entity.point.pixelSize = 10;
+                            entity.point.color = Cesium.Color.WHITE;
+                        }
+                    });
+                    
+                    showAllPoints();
+                }
+
+                // 优化事件监听
+                playButton.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    // 添加防抖
+                    if (playButton.getAttribute('data-clicking')) return;
+                    playButton.setAttribute('data-clicking', 'true');
+                    
+                    if (isPlaying) {
+                        stopPlay();
+                    } else {
+                        startPlay();
+                    }
+                    
+                    // 200ms后移除防抖标记
+                    setTimeout(() => {
+                        playButton.removeAttribute('data-clicking');
+                    }, 200);
+                });
+
+                // 优化滑块事件
+                slider.addEventListener('input', (e) => {
+                    e.stopPropagation();
+                    const value = parseInt(e.target.value);
+                    updateToStep(value);
+                });
+
+                // 优化速度控制
+                speedSelect.addEventListener('change', (e) => {
+                    e.stopPropagation();
+                    if (isPlaying) {
+                        lastTime = 0; // 重置时间以适应新速度
+                    }
+                });
+
+                // 确保时间轴控件不影响地图操作
+                timelineContainer.addEventListener('mousedown', (e) => e.stopPropagation(), true);
+                timelineContainer.addEventListener('mousemove', (e) => e.stopPropagation(), true);
+                timelineContainer.addEventListener('mouseup', (e) => e.stopPropagation(), true);
+                timelineContainer.addEventListener('wheel', (e) => {
+                    e.stopPropagation(); // 仅阻止冒泡
+                });
+                timelineContainer.addEventListener('touchstart', (e) => e.stopPropagation(), true);
+                timelineContainer.addEventListener('touchmove', (e) => e.stopPropagation(), true);
+                timelineContainer.addEventListener('touchend', (e) => e.stopPropagation(), true);
+
+                // 确保地图控制始终启用
+                viewer.scene.screenSpaceCameraController.enableRotate = true;
+                viewer.scene.screenSpaceCameraController.enableTranslate = true;
+                viewer.scene.screenSpaceCameraController.enableZoom = true;
+                viewer.scene.screenSpaceCameraController.enableTilt = true;
+                viewer.scene.screenSpaceCameraController.enableLook = true;
+
+                // 初始化显示
+                slider.min = 0;
+                slider.max = totalSteps;
+                slider.value = 0;
+                showAllPoints();
+            }
+            
+            // 在地图加载完成后初始化时间轴
+            viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => {
+                if (viewer.scene.globe.tilesLoaded) {
+                    setupTimeline();
+                }
+            });
+
+            // 修改 setupSidebar 函数
+            function setupSidebar() {
+                const sidebar = document.querySelector('.sidebar');
+                const sidebarToggle = document.querySelector('.sidebar-toggle');
+                const locationList = document.querySelector('.location-list');
+
+                // 移除原有的鼠标事件监听器
+                sidebarToggle.removeEventListener('mouseenter', () => {});
+                sidebarToggle.removeEventListener('mouseleave', () => {});
+                document.removeEventListener('mousemove', () => {});
+
+                // 修改生成地点列表的代码
+                function updateLocationList() {
+                    const locationList = document.querySelector('.location-list');
+                    
+                    // 清空现有列表
+                    while (locationList.firstChild) {
+                        locationList.removeChild(locationList.firstChild);
+                    }
+
+                    // 使用Set过滤重复项
+                    const uniqueNames = new Set();
+                    longMarchData.forEach(point => {
+                        if (!uniqueNames.has(point.name)) {
+                            uniqueNames.add(point.name);
+                            
+                            const li = document.createElement('li');
+                            li.className = 'location-item';
+                            li.innerHTML = `
+                                <strong>${point.name}</strong><br>
+                                <em>${point.time}</em>
+                            `;
+                            
+                            // 添加点击事件
+                            li.addEventListener('click', () => {
+                                // 计算初始相机位置
+                                const heading = Cesium.Math.toRadians(0);
+                                const pitch = Cesium.Math.toRadians(-45);
+                                const initialRange = 50000;
+                                
+                                // 设置目标点位置
+                                const targetPosition = Cesium.Cartesian3.fromDegrees(
+                                    point.x,
+                                    point.y,
+                                    0
+                                );
+                                
+                                viewer.camera.flyTo({
+                                    destination: Cesium.Cartesian3.add(
+                                        targetPosition,
+                                        Cesium.Cartesian3.multiplyByScalar(
+                                            viewer.camera.direction,
+                                            -initialRange,
+                                            new Cesium.Cartesian3()
+                                        ),
+                                        new Cesium.Cartesian3()
+                                    ),
+                                    orientation: {
+                                        heading: heading,
+                                        pitch: pitch,
+                                        roll: 0
+                                    },
+                                    duration: 2,
+                                    complete: function() {
+                                        const controller = viewer.scene.screenSpaceCameraController;
+                                        controller.minimumZoomDistance = 500;
+                                        controller.maximumZoomDistance = 10000000;
+                                        controller.zoomFactor = 1.2;
+                                        controller.inertiaZoom = 0.95;
+                                        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+                                        viewer.camera._setTransform(Cesium.Matrix4.IDENTITY);
+                                        
+                                        // 高亮显示逻辑
+                                        viewer.entities.values.forEach(entity => {
+                                            if (entity.id.startsWith('point-')) {
+                                                const pointId = parseInt(entity.id.split('-')[1]);
+                                                entity.point.pixelSize = pointId === point.id ? 15 : 10;
+                                                entity.point.color = pointId === point.id ? Cesium.Color.YELLOW : Cesium.Color.WHITE;
+                                            }
+                                        });
+                                    }
+                                });
+
+                                // 显示点位信息面板
+                                const infoPanel = document.getElementById('info-panel');
+                                infoPanel.innerHTML = `
+                                    <h3>${point.name}</h3>
+                                    <p>省份：${point.province}</p>
+                                    <p>经度：${point.x}</p>
+                                    <p>纬度：${point.y}</p>
+                                    <p>备注：${point.remark}</p>
+                                    <p>时间：${point.time}</p>
+                                `;
+                                infoPanel.style.display = 'block';
+                            });
+                            
+                            locationList.appendChild(li);
+                        }
+                    });
+                }
+
+                // 在数据加载完成后调用
+                updateLocationList();
+
+                // 防止侧栏操作影响地图
+                sidebar.addEventListener('mousedown', (e) => e.stopPropagation());
+                sidebar.addEventListener('mousemove', (e) => e.stopPropagation());
+                sidebar.addEventListener('mouseup', (e) => e.stopPropagation());
+                sidebar.addEventListener('wheel', (e) => e.stopPropagation());
+                sidebar.addEventListener('touchstart', (e) => e.stopPropagation());
+                sidebar.addEventListener('touchmove', (e) => e.stopPropagation());
+                sidebar.addEventListener('touchend', (e) => e.stopPropagation());
+            }
+
+            // 在地图加载完成后初始化侧栏和时间轴
+            viewer.scene.globe.tileLoadProgressEvent.addEventListener(() => {
+                if (viewer.scene.globe.tilesLoaded) {
+                    setupSidebar();
+                    setupTimeline();
+                }
+            });
+
+            // 配置按需渲染模式
+            viewer.scene.requestRenderMode = true;
+            viewer.scene.preRender.addEventListener(() => {
+                viewer.scene.requestRender();
+            });
+
+            // 在初始化后添加这些性能优化
+            viewer.scene.globe.maxScreenSpaceError = 2; // 降低地形精度（默认1.0）
+            viewer.scene.globe.preloadAncestors = false;
+            viewer.scene.globe.dynamicAtmosphereLighting = false;
+            viewer.scene.fog.enabled = false;
+            viewer.scene.skyAtmosphere.show = false;
+
+            // 非线性缩放曲线函数
+            function exponentialZoom(delta) {
+                const sign = Math.sign(delta);
+                const absDelta = Math.min(Math.abs(delta), 1);
+                return sign * Math.pow(absDelta, 2);
+            }
+
+            // 重写滚轮事件处理
+            viewer.scene.screenSpaceCameraController.zoom = function(delta) {
+                const adjustedDelta = exponentialZoom(delta);
+                Cesium.ScreenSpaceCameraController.prototype.zoom.call(this, adjustedDelta);
+            };
+
+            // 添加智能边缘检测
+            let hideTimeout;
+            const sidebar = document.querySelector('.sidebar');
+            const triggerBtn = document.getElementById('locationSummaryBtn');
+
+            // 精确控制显示逻辑
+            triggerBtn.addEventListener('mouseenter', () => {
+                clearTimeout(hideTimeout);
+                sidebar.style.right = '0';
+            });
+
+            [triggerBtn, sidebar].forEach(element => {
+                element.addEventListener('mouseleave', (e) => {
+                    if (!e.relatedTarget || 
+                        !(e.relatedTarget === triggerBtn || 
+                          e.relatedTarget === sidebar || 
+                          e.relatedTarget.closest('.sidebar'))) {
+                        hideTimeout = setTimeout(() => {
+                            sidebar.style.right = '-300px';
+                        }, 300); // 300ms延迟防止误触
+                    }
+                });
+            });
+
+            // 修改 showInfoPanel 函数
+            function showInfoPanel(position, content) {
+                const infoPanel = document.getElementById('info-panel');
+                
+                // 固定面板在页面右上角
+                const panelWidth = 300;
+                const panelHeight = 200;
+                const rightOffset = 100; // 确保不与侧边栏重合
+                const topOffset = 100;   // 向下移动的偏移量
+
+                // 应用定位
+                infoPanel.style.cssText = `
+                    right: ${rightOffset}px;
+                    top: ${topOffset}px;
+                    display: block;
+                    position: fixed;  // 使用固定定位
+                `;
+                infoPanel.className = 'info-panel';
+                infoPanel.innerHTML = content;
+            }
+        }).catch(error => {
+            console.error('地形加载失败:', error);
+            alert('地形加载失败，请检查网络连接或 Access Token');
+        });
+    </script>
+</body>
+</html>
